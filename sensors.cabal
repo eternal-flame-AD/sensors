@@ -1,0 +1,56 @@
+cabal-version:   3.0
+name:            sensors
+version:         0.1.0.0
+license:         Apache-2.0
+license-file:    LICENSE
+maintainer:      yume@yumechi.jp
+author:          eternal-flame-AD
+homepage:        https://github.com/eternal-flame-AD/sensors
+synopsis:        Reading hardware sensors on your platform.
+description:
+    This library provides a way to read hardware sensors on your platform.
+    Currently, only lm_sensors backend is supported.
+
+category:        System
+build-type:      Simple
+extra-doc-files: CHANGELOG.md
+
+flag lm_sensors
+    description: Use lm_sensors library
+
+flag lm_sensors_static
+    description: Use lm_sensors static library
+    default:     False
+
+library
+    exposed-modules:  System.Sensors
+    hs-source-dirs:   src
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:    base >= 4.12 && < 5
+
+    if (flag(lm_sensors) || flag(lm_sensors_static))
+        exposed-modules:
+            System.Sensors.LmSensors
+            System.Sensors.LmSensors.Types
+
+        other-modules:   System.Sensors.Internal.LmSensors
+        ghc-options:     -optP-DUSE_LM_SENSORS
+
+    if flag(lm_sensors)
+        extra-libraries: sensors
+
+    if flag(lm_sensors_static)
+        extra-libraries: sensors_static
+
+executable sensors-dump
+    main-is:          Main.hs
+    hs-source-dirs:   cmd/sensors-dump
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base >= 4.12 && < 5,
+        sensors
+
+    if (flag(lm_sensors) || flag(lm_sensors_static))
+        ghc-options: -optP-DUSE_LM_SENSORS
