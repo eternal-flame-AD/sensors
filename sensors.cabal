@@ -15,6 +15,10 @@ category:        System
 build-type:      Simple
 extra-doc-files: CHANGELOG.md
 
+source-repository head
+    type: git
+    location: https://github.com/eternal-flame-AD/sensors
+
 flag lm_sensors
     description: Use lm_sensors library
 
