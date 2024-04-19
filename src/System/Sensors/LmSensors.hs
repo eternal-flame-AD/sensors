@@ -58,7 +58,7 @@ instance
     LmSensors ->
     SensorsChipName ->
     m (Either SensorsError [SensorsFeature])
-  getFeatures _ chip = liftIO $ do
+  getFeatures _ chip = liftIO $
     with chip $ \chipPtr ->
       (iterateAPI . sensors_get_features) chipPtr
         >>= mapM peek
@@ -69,9 +69,9 @@ instance
     SensorsChipName ->
     SensorsFeature ->
     m (Either SensorsError [SensorsSubfeature])
-  getSubFeatures _ chip feat = liftIO $ do
-    with chip $ \chipPtr -> do
-      with feat $ \featPtr -> do
+  getSubFeatures _ chip feat = liftIO $
+    with chip $ \chipPtr ->
+      with feat $ \featPtr ->
         (iterateAPI $ sensors_get_all_subfeatures chipPtr featPtr)
           >>= mapM peek
           >>= return . Right
@@ -82,13 +82,17 @@ instance
     SensorsFeature ->
     SensorsSubfeature ->
     m (Either SensorsError Double)
-  getSubFeatureValue _ chip _ subfeat = liftIO $ alloca $ \ptr -> do
+  getSubFeatureValue _ chip _ subfeat = liftIO $ alloca $ \ptr ->
     let nr = subfeatureNumber subfeat
-    with chip $ \chipPtr -> do
-      with 0 $ \valuePtr -> do
-        poke ptr nr
-        _ <- sensors_get_value chipPtr nr valuePtr >>= checkRet
-        Right <$> peek (coerce valuePtr)
+     in with chip $ \chipPtr ->
+          with 0 $ \valuePtr ->
+            poke ptr nr
+              >> sensors_get_value chipPtr nr valuePtr
+              >>= checkRet
+              >>= return
+                ( Right
+                    <$> peek (coerce valuePtr)
+                )
   setSubFeatureValue ::
     (MonadIO m) =>
     LmSensors ->
@@ -97,9 +101,10 @@ instance
     SensorsSubfeature ->
     Double ->
     m (Either SensorsError ())
-  setSubFeatureValue _ chip _ subfeat value = liftIO $ alloca $ \ptr -> do
+  setSubFeatureValue _ chip _ subfeat value = liftIO $ alloca $ \ptr ->
     let nr = subfeatureNumber subfeat
-    with chip $ \chipPtr -> do
-      poke ptr nr
-      _ <- sensors_set_value chipPtr nr (CDouble value) >>= checkRet
-      return $ Right ()
+     in with chip $ \chipPtr ->
+          poke ptr nr
+            >> sensors_set_value chipPtr nr (CDouble value)
+            >>= checkRet
+            >>= return (return $ Right ())
