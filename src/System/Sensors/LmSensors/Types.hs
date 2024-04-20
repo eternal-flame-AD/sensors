@@ -1,11 +1,10 @@
-{- |
-Module: System.Sensors.LmSensors.Types
-Description: Type definitions for lm-sensors bindings
-License: Apache-2.0
-Maintainer: yume@yumechi.jp
-Stability: experimental
-Portability: POSIX
--}
+-- |
+-- Module: System.Sensors.LmSensors.Types
+-- Description: Type definitions for lm-sensors bindings
+-- License: Apache-2.0
+-- Maintainer: yume@yumechi.jp
+-- Stability: experimental
+-- Portability: POSIX
 module System.Sensors.LmSensors.Types where
 
 import Control.Monad.IO.Class (MonadIO)
@@ -13,9 +12,8 @@ import Foreign
 import Foreign.C (CString)
 import Foreign.C.Types
 
-{- | Error codes returned by the lm_sensors library
-     The corresponding error codes and messages are defined in <sensors/error.h>
--}
+-- | Error codes returned by the lm_sensors library
+--     The corresponding error codes and messages are defined in <sensors/error.h>
 data SensorsError = ErrWildcards | ErrNoEntry | ErrAccessR | ErrKernel | ErrDivZero | ErrChipName | ErrBusName | ErrParse | ErrAccessW | ErrIO | ErrRecursion
   deriving (Eq, Show)
 
@@ -69,8 +67,8 @@ checkRet ret
   | otherwise = return $ Left $ toEnum $ fromIntegral ret
 
 data SensorsBusId = SensorsBusId
-  { busType :: CShort
-  , busNr :: CShort
+  { busType :: CShort,
+    busNr :: CShort
   }
   deriving (Show)
 
@@ -86,10 +84,10 @@ instance Storable SensorsBusId where
     pokeByteOff ptr 2 busNrV
 
 data SensorsChipName = SensorsChipName
-  { chipPrefix :: CString
-  , chipBus :: SensorsBusId
-  , chipAddr :: CInt
-  , chipPath :: CString
+  { chipPrefix :: CString,
+    chipBus :: SensorsBusId,
+    chipAddr :: CInt,
+    chipPath :: CString
   }
   deriving (Show)
 
@@ -140,9 +138,10 @@ decodeSubFeatureFlags :: CInt -> SubFeatureFlags
 decodeSubFeatureFlags flags =
   SubFeatureFlags
     [ snd flag
-    | flag <- [(1, SensorsModeR), (2, SensorsModeW), (4, SensorsComputeMapping)]
-    , flags .&. (fst flag) /= 0
+      | flag <- [(1, SensorsModeR), (2, SensorsModeW), (4, SensorsComputeMapping)],
+        flags .&. (fst flag) /= 0
     ]
+
 instance Storable SubFeatureFlags where
   sizeOf _ = 4
   alignment _ = 4
@@ -153,11 +152,11 @@ instance Storable SubFeatureFlags where
     pokeByteOff ptr 0 $ encodeSubFeatureFlags $ SubFeatureFlags flags
 
 data SensorsFeature = SensorsFeature
-  { featureName :: CString
-  , featureNumber :: CInt
-  , sensorFeatureType :: FeatureType
-  , firstSubfeature :: CInt
-  , sensorsFeaturePadding1 :: CInt
+  { featureName :: CString,
+    featureNumber :: CInt,
+    sensorFeatureType :: FeatureType,
+    firstSubfeature :: CInt,
+    sensorsFeaturePadding1 :: CInt
   }
   deriving (Show)
 
@@ -179,11 +178,11 @@ instance Storable SensorsFeature where
     pokeByteOff ptr 20 padding
 
 data SensorsSubfeature = SensorsSubfeature
-  { subfeatureName :: CString
-  , subfeatureNumber :: CInt
-  , sensorSubfeatureType :: FeatureType
-  , sensorSubfeatureMapping :: CInt
-  , sensorSubfeatureFlags :: CInt
+  { subfeatureName :: CString,
+    subfeatureNumber :: CInt,
+    sensorSubfeatureType :: FeatureType,
+    sensorSubfeatureMapping :: CInt,
+    sensorSubfeatureFlags :: CInt
   }
   deriving (Show)
 

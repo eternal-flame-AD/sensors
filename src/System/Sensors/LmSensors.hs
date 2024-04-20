@@ -3,17 +3,16 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-{- |
-Module: System.Sensors.LmSensors
-Description: Implementation of the [@Sensors@] typeclass for lm-sensors
-License: Apache-2.0
-Maintainer: yume@yumechi.jp
-Stability: experimental
-Portability: POSIX
--}
-module System.Sensors.LmSensors (
-  LmSensors,
-)
+-- |
+-- Module: System.Sensors.LmSensors
+-- Description: Implementation of the [@Sensors@] typeclass for lm-sensors
+-- License: Apache-2.0
+-- Maintainer: yume@yumechi.jp
+-- Stability: experimental
+-- Portability: POSIX
+module System.Sensors.LmSensors
+  ( LmSensors,
+  )
 where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -30,14 +29,15 @@ instance
   (MonadIO m) =>
   Sensors
     LmSensors
+    ()
     SensorsChipName
     SensorsFeature
     SensorsSubfeature
     SensorsError
     m
   where
-  sensorsInit :: (MonadIO m) => m (Either SensorsError LmSensors)
-  sensorsInit =
+  sensorsInit :: (MonadIO m) => () -> m (Either SensorsError LmSensors)
+  sensorsInit _ =
     liftIO $
       sensors_init nullPtr >>= checkRet >>= \case
         Left ret -> return $ Left ret
@@ -81,7 +81,7 @@ instance
     SensorsChipName ->
     SensorsFeature ->
     SensorsSubfeature ->
-    m (Either SensorsError Double)
+    m (Either SensorsError SensorValue)
   getSubFeatureValue _ chip _ subfeat = liftIO $ alloca $ \ptr ->
     let nr = subfeatureNumber subfeat
      in with chip $ \chipPtr ->
@@ -91,20 +91,6 @@ instance
               >>= checkRet
               >>= return
                 ( Right
+                    <$> DoubleValue
                     <$> peek (coerce valuePtr)
                 )
-  setSubFeatureValue ::
-    (MonadIO m) =>
-    LmSensors ->
-    SensorsChipName ->
-    SensorsFeature ->
-    SensorsSubfeature ->
-    Double ->
-    m (Either SensorsError ())
-  setSubFeatureValue _ chip _ subfeat value = liftIO $ alloca $ \ptr ->
-    let nr = subfeatureNumber subfeat
-     in with chip $ \chipPtr ->
-          poke ptr nr
-            >> sensors_set_value chipPtr nr (CDouble value)
-            >>= checkRet
-            >>= return (return $ Right ())

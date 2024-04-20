@@ -8,7 +8,9 @@ A cli interface for querying sensors on your platform.
 
 # Usage
 
-## sensors-dump
+## sensors-hs CLI
+
+### `dump` command
 
 Enumerate all sensor backends and dump the sensor data. Useful for debugging.
 
@@ -17,7 +19,7 @@ Enumerate all sensor backends and dump the sensor data. Useful for debugging.
 ## Backend support
 
 - [X] lm_sensors
-- [ ] nvidia-smi
+- [X] nvidia-smi
 - [ ] hwmon
 - [ ] Windows API/WMI
 
