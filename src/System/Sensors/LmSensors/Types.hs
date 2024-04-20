@@ -13,8 +13,24 @@ import Foreign
 import Foreign.C (CString)
 import Foreign.C.Types
 
+{- | Error codes returned by the lm_sensors library
+     The corresponding error codes and messages are defined in <sensors/error.h>
+-}
 data SensorsError = ErrWildcards | ErrNoEntry | ErrAccessR | ErrKernel | ErrDivZero | ErrChipName | ErrBusName | ErrParse | ErrAccessW | ErrIO | ErrRecursion
-  deriving (Eq)
+  deriving (Eq, Show)
+
+errorMessage :: SensorsError -> String
+errorMessage ErrWildcards = "Wildcard found in chip name"
+errorMessage ErrNoEntry = "No such subfeature known"
+errorMessage ErrAccessR = "Can't read"
+errorMessage ErrKernel = "Kernel interface error"
+errorMessage ErrDivZero = "Divide by zero"
+errorMessage ErrChipName = "Can't parse chip name"
+errorMessage ErrBusName = "Can't parse bus name"
+errorMessage ErrParse = "General parse error"
+errorMessage ErrAccessW = "Can't write"
+errorMessage ErrIO = "I/O error"
+errorMessage ErrRecursion = "Evaluation recurses too deep"
 
 instance Enum SensorsError where
   fromEnum ErrWildcards = 1
@@ -40,19 +56,12 @@ instance Enum SensorsError where
   toEnum 10 = ErrIO
   toEnum 11 = ErrRecursion
   toEnum _ = error "Invalid SensorsError"
+  enumFrom begin = [begin .. maxBound]
+  enumFromThen begin next = [begin, next .. maxBound]
 
-instance Show SensorsError where
-  show ErrWildcards = "Wildcard found in chip name"
-  show ErrNoEntry = "No such subfeature known"
-  show ErrAccessR = "Can't read"
-  show ErrKernel = "Kernel interface error"
-  show ErrDivZero = "Divide by zero"
-  show ErrChipName = "Can't parse chip name"
-  show ErrBusName = "Can't parse bus name"
-  show ErrParse = "General parse error"
-  show ErrAccessW = "Can't write"
-  show ErrIO = "I/O error"
-  show ErrRecursion = "Evaluation recurses too deep"
+instance Bounded SensorsError where
+  minBound = ErrWildcards
+  maxBound = ErrRecursion
 
 checkRet :: (MonadIO m) => CInt -> m (Either SensorsError ())
 checkRet ret
@@ -104,15 +113,6 @@ type FeatureType = CInt
 data SubFeatureFlag = SensorsModeR | SensorsModeW | SensorsComputeMapping
   deriving (Show, Eq)
 
-instance Enum SubFeatureFlag where
-  fromEnum SensorsModeR = 1
-  fromEnum SensorsModeW = 2
-  fromEnum SensorsComputeMapping = 4
-  toEnum 1 = SensorsModeR
-  toEnum 2 = SensorsModeW
-  toEnum 4 = SensorsComputeMapping
-  toEnum _ = error "Invalid SubFeatureFlag"
-
 newtype SubFeatureFlags = SubFeatureFlags [SubFeatureFlag]
   deriving (Show, Eq)
 
@@ -120,11 +120,29 @@ hasFlag :: SubFeatureFlag -> SubFeatureFlags -> Bool
 hasFlag flag (SubFeatureFlags flags) = flag `elem` flags
 
 encodeSubFeatureFlags :: SubFeatureFlags -> CInt
-encodeSubFeatureFlags (SubFeatureFlags flags) = foldr (.|.) 0 [fromIntegral $ fromEnum flag | flag <- flags]
+encodeSubFeatureFlags (SubFeatureFlags flags) =
+  foldl
+    ( \acc flag ->
+        if flag == SensorsModeR
+          then acc .|. 1
+          else
+            if flag == SensorsModeW
+              then acc .|. 2
+              else
+                if flag == SensorsComputeMapping
+                  then acc .|. 4
+                  else acc
+    )
+    0
+    flags
 
 decodeSubFeatureFlags :: CInt -> SubFeatureFlags
-decodeSubFeatureFlags flags = SubFeatureFlags [flag | flag <- [SensorsModeR, SensorsModeW, SensorsComputeMapping], flags .&. (fromIntegral . fromEnum) flag /= 0]
-
+decodeSubFeatureFlags flags =
+  SubFeatureFlags
+    [ snd flag
+    | flag <- [(1, SensorsModeR), (2, SensorsModeW), (4, SensorsComputeMapping)]
+    , flags .&. (fst flag) /= 0
+    ]
 instance Storable SubFeatureFlags where
   sizeOf _ = 4
   alignment _ = 4
