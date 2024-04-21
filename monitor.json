@@ -1,0 +1,47 @@
+{
+    "monitors": {
+        "nvidia-smi": {
+            "specs": [
+                {
+                    "chip": "GPU-ed32970d-94c8-4aed-f1f9-d608de4d6262",
+                    "feature": "gpu",
+                    "sub_feature": "power.draw.average"
+                },
+                {
+                    "chip": "GPU-ed32970d-94c8-4aed-f1f9-d608de4d6262",
+                    "feature": "gpu",
+                    "sub_feature": "temperature.gpu"
+                },
+                {
+                    "chip": "GPU-ed32970d-94c8-4aed-f1f9-d608de4d6262",
+                    "feature": "gpu",
+                    "sub_feature": "utilization.gpu"
+                },
+                {
+                    "chip": "GPU-ed32970d-94c8-4aed-f1f9-d608de4d6262",
+                    "feature": "gpu",
+                    "sub_feature": "utilization.memory"
+                }
+            ]
+        },
+        "lm-sensors": {
+            "specs": [
+                {
+                    "chip": "k10temp",
+                    "feature": "temp1",
+                    "sub_feature": "temp1_input"
+                },
+                {
+                    "chip": "k10temp",
+                    "feature": "temp3",
+                    "sub_feature": "temp3_input"
+                },
+                {
+                    "chip": "k10temp",
+                    "feature": "temp4",
+                    "sub_feature": "temp4_input"
+                }
+            ]
+        }
+    }
+}

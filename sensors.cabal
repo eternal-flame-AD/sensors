@@ -9,7 +9,7 @@ homepage:        https://github.com/eternal-flame-AD/sensors
 synopsis:        Reading hardware sensors on your platform.
 description:
     This library provides a way to read hardware sensors on your platform.
-    Currently, only lm_sensors backend is supported.
+    We currently support lm_sensors and nvidia-smi as backends.
 
 category:        System
 build-type:      Simple
@@ -28,16 +28,23 @@ flag lm_sensors_static
 
 flag nvidia_smi
     description: Use nvidia-smi command backend
+    default:     True
+
+flag xmobar
+    description: Build xmobar plugin
     default:     False
 
 library
-    exposed-modules:  System.Sensors
+    exposed-modules:  System.Sensors,
+                      System.Sensors.Monitor,
+                      System.Sensors.Utils
     hs-source-dirs:   src
     default-language: Haskell2010
     ghc-options:      -Wall
     build-depends:
         base >=4.12 && <5,
-        data-default ^>=0.7
+        data-default ^>=0.7,
+        aeson ^>=2.2
 
     if (flag(lm_sensors) || flag(lm_sensors_static))
         exposed-modules:
@@ -58,11 +65,18 @@ library
             System.Sensors.NvidiaSMI
             System.Sensors.NvidiaSMI.Types
 
+        ghc-options:     -optP-DUSE_NVIDIA_SMI
         other-modules:
             System.Sensors.Internal.NvidiaSMI.Process
             System.Sensors.Internal.NvidiaSMI.Parser
 
         build-depends:   process ^>=1.6
+    
+    if flag(xmobar)
+        exposed-modules:
+            System.Sensors.Xmobar
+        
+        build-depends :  xmobar >=0.44
 
 executable sensors-hs
     main-is:          Main.hs
@@ -73,6 +87,8 @@ executable sensors-hs
         base >=4.12 && <5,
         data-default ^>=0.7,
         optparse-applicative ^>=0.18,
+        aeson ^>=2.2,
+        bytestring ^>=0.12,
         sensors
 
     if (flag(lm_sensors) || flag(lm_sensors_static))
@@ -80,3 +96,6 @@ executable sensors-hs
 
     if flag(nvidia_smi)
         ghc-options: -optP-DUSE_NVIDIA_SMI
+
+    if flag(xmobar)
+        ghc-options: -optP-DUSE_XMOBAR

@@ -1,22 +1,28 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module Main (main) where
 
+import Control.Concurrent
+import qualified Data.Aeson as Ae
+import qualified Data.ByteString.Lazy.Char8 as BSL
+import Data.Default (Default (def))
 import Foreign.C (peekCString)
 import Options.Applicative
 import System.Sensors
+import System.Sensors.Monitor
 
 #ifdef USE_LM_SENSORS
-import System.Sensors.LmSensors (LmSensors)
+import System.Sensors.LmSensors (LmSensors, LmSensorsMonitor)
 import System.Sensors.LmSensors.Types
+import GHC.Generics (Generic)
 #endif
 
 #ifdef USE_NVIDIA_SMI
-import System.Sensors.NvidiaSMI (NvidiaSMI, NvidiaOptions(..), waitForReady)
-import System.Sensors.NvidiaSMI.Types
-import Data.Default (Default(def))
+import System.Sensors.NvidiaSMI (NvidiaSMI, NvidiaSMIMonitor, NvidiaOptions(..), waitForReady)
 #endif
 
 data Options = Options
@@ -25,9 +31,15 @@ data Options = Options
 
 data Command
     = Dump DumpOptions
+    | Monitor MonitorOptions
 
 data DumpOptions = DumpOptions
     { dumpOptionsBackend :: [String]
+    }
+
+data MonitorOptions = MonitorOptions
+    { monitorOptionsInterval :: Int
+    , monitorOptionsConfig :: FilePath
     }
 
 dumpOpts :: Parser DumpOptions
@@ -37,15 +49,99 @@ dumpOpts =
             ( strOption
                 ( long "backend"
                     <> short 'b'
-                    <> metavar "BACKEND"
                     <> help "Backend to dump"
                 )
+            )
+
+data MonitorOutput = MonitorOutput
+    { monitorOutputSpec :: MonitorSpec
+    , monitorOutputValue :: SensorValue
+    }
+    deriving (Generic, Show)
+
+parseMonitorOutputOptions :: Ae.Options
+parseMonitorOutputOptions =
+    Ae.defaultOptions
+        { Ae.fieldLabelModifier = \case
+            "monitorOutputSpec" -> "spec"
+            "monitorOutputValue" -> "value"
+            _ -> error "Unknown field"
+        }
+
+instance Ae.ToJSON MonitorOutput where
+    toJSON = Ae.genericToJSON parseMonitorOutputOptions
+
+data MonitorConfig = MonitorConfig
+    { monitorConfigMonitors :: MonitorConfigBackends
+    }
+    deriving (Generic, Show)
+
+parseMonitorConfigOptions :: Ae.Options
+parseMonitorConfigOptions =
+    Ae.defaultOptions
+        { Ae.fieldLabelModifier = \case
+            "monitorConfigMonitors" -> "monitors"
+            _ -> error "Unknown field"
+        }
+
+instance Ae.FromJSON MonitorConfig where
+    parseJSON = Ae.genericParseJSON parseMonitorConfigOptions
+
+data MonitorConfigBackends = MonitorConfigBackends
+    { monitorConfigBackendLmSensors :: Maybe MonitorSpecs
+    , monitorConfigBackendNvidiaSMI :: Maybe MonitorSpecs
+    }
+    deriving (Generic, Show)
+
+parseMonitorConfigBackendsOptions :: Ae.Options
+parseMonitorConfigBackendsOptions =
+    Ae.defaultOptions
+        { Ae.fieldLabelModifier = \case
+            "monitorConfigBackendLmSensors" -> "lm-sensors"
+            "monitorConfigBackendNvidiaSMI" -> "nvidia-smi"
+            _ -> error "Unknown field"
+        }
+
+instance Ae.FromJSON MonitorConfigBackends where
+    parseJSON = Ae.genericParseJSON parseMonitorConfigBackendsOptions
+data MonitorSpecs = MonitorSpecs
+    { monitorSpecs :: [MonitorSpec]
+    }
+    deriving (Generic, Show)
+
+parseMonitorSpecsOptions :: Ae.Options
+parseMonitorSpecsOptions =
+    Ae.defaultOptions
+        { Ae.fieldLabelModifier = \case
+            "monitorSpecs" -> "specs"
+            _ -> error "Unknown field"
+        }
+
+instance Ae.FromJSON MonitorSpecs where
+    parseJSON = Ae.genericParseJSON parseMonitorSpecsOptions
+
+monitorOpts :: Parser MonitorOptions
+monitorOpts =
+    MonitorOptions
+        <$> option
+            auto
+            ( long "interval"
+                <> short 'i'
+                <> help "Interval in tenths of a second"
+                <> value 10
+            )
+        <*> option
+            str
+            ( long "config"
+                <> short 'c'
+                <> help "Configuration file"
             )
 
 opts :: Parser Options
 opts =
     subparser
         ( command "dump" (info (Options <$> (Dump <$> dumpOpts)) (progDesc "Dump sensor data"))
+            <> command "monitor" (info (Options <$> (Monitor <$> monitorOpts)) (progDesc "Monitor sensor data"))
         )
 
 indent :: Int -> String
@@ -144,3 +240,44 @@ main = do
                             _ -> putStrLn $ "Unknown backend: " ++ backend
                         )
                         (dumpOptionsBackend $ opts)
+        Monitor opts -> do
+            config <- Ae.eitherDecodeFileStrict' $ monitorOptionsConfig opts
+            case config of
+                Left err -> putStrLn $ "Error parsing config: " ++ err
+                Right MonitorConfig{monitorConfigMonitors = monitors} -> do
+                    chan <- newChan
+#ifdef USE_LM_SENSORS
+                    case monitorConfigBackendLmSensors monitors of
+                        Just MonitorSpecs{monitorSpecs = specs} -> setupMonitor @LmSensorsMonitor 
+                                specs 
+                                (monitorOptionsInterval opts) 
+                                (\res -> mapM_
+                                    ( \case
+                                        (spec, value) -> writeChan chan $ MonitorOutput spec value
+                                    )
+                                    res
+                                ) >> return ()
+                        Nothing -> return ()
+#endif
+#ifdef USE_NVIDIA_SMI
+                    case monitorConfigBackendNvidiaSMI monitors of
+                        Just MonitorSpecs{monitorSpecs = specs} -> setupMonitor @NvidiaSMIMonitor 
+                                specs 
+                                (monitorOptionsInterval opts)
+                                (\res -> mapM_
+                                    ( \case
+                                        (spec, value) -> writeChan chan $ MonitorOutput spec value
+                                    )
+                                    res
+                                ) >> return ()
+
+                        Nothing -> return ()
+#endif
+                    let
+                        readLoop :: IO ()
+                        readLoop = do
+                            info <- readChan chan
+                            putStrLn $ BSL.unpack $ Ae.encode info
+                            readLoop
+                     in
+                        readLoop

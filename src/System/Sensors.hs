@@ -1,40 +1,65 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
--- |
--- Module      : System.Sensors
--- Description : An abstraction for a sensor data source.
--- License     : Apache-2.0
--- Maintainer  : yume@yumechi.jp
--- Stability   : experimental
--- Portability : portable
-module System.Sensors
-  ( Sensors (..),
-    SensorValue (..),
-  )
+{- |
+Module      : System.Sensors
+Description : An abstraction for a sensor data source.
+License     : Apache-2.0
+Maintainer  : yume@yumechi.jp
+Stability   : experimental
+Portability : portable
+-}
+module System.Sensors (
+  Sensors (..),
+  SensorValue (..),
+)
 where
 
 import Control.Monad.IO.Class (MonadIO)
+import qualified Data.Aeson as Aeson
+import GHC.Generics (Generic)
 
--- | A sensor value.
---    The value can be an integer, a double, or a string.
+{- | A sensor value.
+  The value can be an integer, a double, or a string.
+-}
 data SensorValue
   = IntValue Int
   | DoubleValue Double
   | StringValue String
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Read)
 
--- | An abstraction for a sensor data source.
---    The data source contains a list of chips, each chip has a list of features, and each feature has a list of subfeatures.
+sensorValueParseOptions :: Aeson.Options
+sensorValueParseOptions =
+  Aeson.defaultOptions
+    { Aeson.sumEncoding = Aeson.ObjectWithSingleField
+    , Aeson.constructorTagModifier = \case
+        "IntValue" -> "int"
+        "DoubleValue" -> "double"
+        "StringValue" -> "string"
+        _ -> error "Unknown constructor"
+    , Aeson.fieldLabelModifier = \case
+        "IntValue" -> "int"
+        "DoubleValue" -> "double"
+        "StringValue" -> "string"
+        _ -> error "Unknown field"
+    }
+
+instance Aeson.ToJSON SensorValue where
+  toJSON = Aeson.genericToJSON sensorValueParseOptions
+
+{- | An abstraction for a sensor data source.
+  The data source contains a list of chips, each chip has a list of features, and each feature has a list of subfeatures.
+-}
 class
   (MonadIO m) =>
   Sensors a opt chip feat subfeat err m
-    | a -> opt,
-      a -> chip,
-      a -> feat,
-      a -> subfeat,
-      a -> err
+    | a -> opt
+    , a -> chip
+    , a -> feat
+    , a -> subfeat
+    , a -> err
   where
   -- | Initialize the sensor data source.
   sensorsInit :: opt -> m (Either err a)
