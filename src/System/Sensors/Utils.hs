@@ -7,7 +7,7 @@ Description: Utility functions for the sensors library
 License: Apache-2.0
 Maintainer: yume@yumechi.jp
 Stability: experimental
-Portability: POSIX
+Portability: portable
 -}
 module System.Sensors.Utils where
 
